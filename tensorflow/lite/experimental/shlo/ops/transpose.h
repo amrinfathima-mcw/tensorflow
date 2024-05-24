@@ -27,10 +27,6 @@ class TransposeOp {
     absl::InlinedVector<Axis, kMaxNumDimensions>& permutation;
   };
   Attributes attributes;
-  Tensor operand_dequantized;
-  Tensor output_dequantized;
-  std::vector<std::byte> operand_dequantized_data;
-  std::vector<std::byte> output_dequantized_data;
 };
 
 TransposeOp Create(TransposeOp::Attributes);

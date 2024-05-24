@@ -96,8 +96,7 @@ TYPED_TEST(NonQuantizedIntTransposeTest, IntTestTypesTensorrsWork1) {
       .permutation = permutation,
   });
 
-  Vector<StorageT> expected_data = Vector<StorageT>{
-      (1), (2), (7), (8), (3), (4), (9), (10), (5), (6), (11), (12)};
+  Vector<StorageT> expected_data = Vector<StorageT>{1, 2, 7, 8, 3, 4, 9, 10, 5, 6, 11, 12};
 
   ASSERT_OK(Prepare(op, operand, output_tensor));
   ASSERT_OK(Evaluate(op, operand, output_tensor));
@@ -108,10 +107,8 @@ TYPED_TEST(NonQuantizedIntTransposeTest, IntTestTypesRaiseAnError1) {
   using StorageT = typename TypeParam::StorageT;
 
   const Shape shape_operand({2, 3, 2});
-  // const Shape shapePermutation({3});
   const Shape shape_r({3, 2, 2});
-  Vector<StorageT> operand_data = Vector<StorageT>{
-      (1), (2), (3), (4), (5), (6), (7), (8), (9), (10), (11), (12)};
+  Vector<StorageT> operand_data = Vector<StorageT>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
   absl::InlinedVector<Axis, kMaxNumDimensions> permutation = {1, 3, 2};
   Vector<StorageT> output_data(shape_r.NumElements());
 
@@ -138,10 +135,8 @@ TYPED_TEST(NonQuantizedIntTransposeTest, IntTestTypesRaiseAnError2) {
   using StorageT = typename TypeParam::StorageT;
 
   const Shape shape_operand({2, 3, 2});
-  // const Shape shapePermutation({3});
   const Shape shape_r({2, 2, 3});
-  Vector<StorageT> operand_data = Vector<StorageT>{
-      (1), (2), (3), (4), (5), (6), (7), (8), (9), (10), (11), (12)};
+  Vector<StorageT> operand_data = Vector<StorageT>{1,2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
   absl::InlinedVector<Axis, kMaxNumDimensions> permutation = {1, 0, 2};
   Vector<StorageT> output_data(shape_r.NumElements());
 
@@ -345,13 +340,14 @@ template <class T>
 struct QuantizedIntTransposeTest : ::testing::Test {};
 
 TYPED_TEST_SUITE(QuantizedIntTransposeTest, QuantizedTestTypes, TestParamNames);
+
 TYPED_TEST(QuantizedIntTransposeTest, QuantizedTestTypesTensorsWork1) {
   using StorageT = typename TypeParam::StorageT;
   using ExpressedT = typename TypeParam::ExpressedT;
+
   const Shape shape_operand({2, 3, 2});
   const Shape shape_r({3, 2, 2});
-  Vector<StorageT> operand_data =
-      Vector<StorageT>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+  Vector<StorageT> operand_data =Vector<StorageT>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
   absl::InlinedVector<Axis, kMaxNumDimensions> permutation = {1, 0, 2};
   Vector<StorageT> output_data(shape_r.NumElements());
   const ExpressedT scale = static_cast<ExpressedT>(1.5);
@@ -373,25 +369,17 @@ TYPED_TEST(QuantizedIntTransposeTest, QuantizedTestTypesTensorsWork1) {
       .permutation = permutation,
   });
 
-  Vector<float> expected_data{1.5,  3,  10.5, 12, 4.5,  6,
-                              13.5, 15, 7.5,  9,  16.5, 18};
-  Vector<StorageT> expected_quantized(shape_r.NumElements());
-  std::transform(expected_data.begin(), expected_data.end(),
-                 expected_quantized.begin(), [&](float val) {
-                   return Quantize<TypeParam::kStorage, TypeParam::kExpressed>(
-                       static_cast<ExpressedT>(val), zero_point,
-                       static_cast<ExpressedT>(1.0) / scale);
-                 });
+  Vector<StorageT> expected_data{1, 2, 7, 8, 3, 4, 9, 10, 5, 6, 11, 12 };
 
   ASSERT_OK(Prepare(op, operand, output_tensor));
   ASSERT_OK(Evaluate(op, operand, output_tensor));
-
-  EXPECT_THAT(output_data, Pointwise(Eq(), expected_quantized));
+  EXPECT_THAT(output_data, Pointwise(Eq(), expected_data));
 }
 
 TYPED_TEST(QuantizedIntTransposeTest, QuantizedTestTypesTensorsWork2) {
   using StorageT = typename TypeParam::StorageT;
   using ExpressedT = typename TypeParam::ExpressedT;
+
   const Shape shape_operand({1, 3, 2});
   const Shape shape_r({3, 1, 2});
   Vector<StorageT> operand_data = Vector<StorageT>{1, 2, 3, 4, 5, 6};
@@ -435,9 +423,10 @@ TYPED_TEST(QuantizedIntTransposeTest, QuantizedTestTypesTensorsWork2) {
   EXPECT_THAT(output_data, Pointwise(Eq(), expected_quantized));
 }
 
-TYPED_TEST(QuantizedIntTransposeTest, QuantizedTestTypesTensorsRaiseAnError1) {
+TYPED_TEST(QuantizedIntTransposeTest, InvalidQuantizationDimensionRaiseAnError) {
   using StorageT = typename TypeParam::StorageT;
   using ExpressedT = typename TypeParam::ExpressedT;
+
   const Shape shape_operand({2, 3, 2});
   const Shape shape_r({3, 2, 2});
   Vector<StorageT> operand_data =
@@ -473,9 +462,10 @@ TYPED_TEST(QuantizedIntTransposeTest, QuantizedTestTypesTensorsRaiseAnError1) {
       "equal to the permutation of quantization dimension of output.");
 }
 
-TYPED_TEST(QuantizedIntTransposeTest, QuantizedTestTypesTensorsRaiseAnError2) {
+TYPED_TEST(QuantizedIntTransposeTest, DifferentElementTypeRaiseAnError) {
   using StorageT = typename TypeParam::StorageT;
   using ExpressedT = typename TypeParam::ExpressedT;
+
   const Shape shape_operand({2, 3, 2});
   const Shape shape_r({3, 2, 2});
   Vector<StorageT> operand_data =
@@ -490,10 +480,10 @@ TYPED_TEST(QuantizedIntTransposeTest, QuantizedTestTypesTensorsRaiseAnError2) {
   std::vector<float> scalesv = {1.2, 1.1};
   QuantizedElementTypePerAxis tensor_type_axis(
       TypeParam::kStorage, zero_points, TypeParam::kExpressed, scales, 0);
-
   QuantizedElementTypePerAxis tensor_type_axis_output(
       TypeParam::kStorage, zero_points_output, TypeParam::kExpressed,
-      scales_output, 0);
+      scales_output, 1);
+      
   Tensor operand{
       .type = QuantizedPerAxisTensorType{.shape = shape_operand,
                                          .element_type = tensor_type_axis},
@@ -512,9 +502,8 @@ TYPED_TEST(QuantizedIntTransposeTest, QuantizedTestTypesTensorsRaiseAnError2) {
   EXPECT_THAT(status, shlo_ref::testing::StatusIs(
                           absl::StatusCode::kFailedPrecondition));
   EXPECT_THAT(
-      status.message(),
-      ::testing::ContainsRegex(
-          "stablehlo.transpose: baseline type constraint is not satisfied"));
+      status.message(),::testing::ContainsRegex(
+          "stablehlo.transpose: element type constraint is not satisfied"));
 }
 
 }  // namespace

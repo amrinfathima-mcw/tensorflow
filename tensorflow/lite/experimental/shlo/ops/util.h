@@ -96,6 +96,11 @@ bool IsQuantizedPerAxisTensor(const Tensor& tensor);
 absl::Status CheckSameBaselineType(CheckCtx ctx, const Tensor& tensor1,
                                    const Tensor& tensor2);
 
+// Checks that both tensors have the same element type.
+absl::Status CheckSameElementType(CheckCtx ctx, const Tensor& tensor1,
+                                   const Tensor& tensor2);
+
+
 }  // namespace shlo_ref
 
 #endif  // TENSORFLOW_LITE_EXPERIMENTAL_SHLO_OPS_UTIL_H_
