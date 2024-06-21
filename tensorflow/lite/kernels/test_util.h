@@ -15,6 +15,8 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_KERNELS_TEST_UTIL_H_
 #define TENSORFLOW_LITE_KERNELS_TEST_UTIL_H_
 
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -26,21 +28,21 @@ limitations under the License.
 #include <cstdlib>
 #include <functional>
 #include <initializer_list>
+#include <iostream>
 #include <limits>
 #include <map>
 #include <memory>
-#include <ostream>
 #include <string>
 #include <tuple>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
 #include "absl/algorithm/container.h"
 #include "absl/types/span.h"
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
+#include "tensorflow/core/platform/byte_order.h"
 #include "tensorflow/lite/core/api/op_resolver.h"
 #include "tensorflow/lite/core/c/common.h"
 #include "tensorflow/lite/core/interpreter.h"
@@ -55,7 +57,12 @@ limitations under the License.
 #include "tensorflow/lite/tools/optimize/quantization_utils.h"
 #include "tensorflow/lite/type_to_tflitetype.h"
 #include "tensorflow/lite/util.h"
+#include "tsl/platform/bfloat16.h"
 #include "tsl/platform/logging.h"
+
+namespace tensorflow {
+typedef tsl::bfloat16 bfloat16;
+}
 
 namespace tflite {
 
@@ -105,6 +112,11 @@ inline std::vector<float> Dequantize(const std::vector<T>& data, float scale,
 template <>
 constexpr TfLiteType typeToTfLiteType<Eigen::half>() {
   return kTfLiteFloat16;
+}
+
+template <>
+constexpr TfLiteType typeToTfLiteType<tensorflow::bfloat16>() {
+  return kTfLiteBFloat16;
 }
 
 // A test model that contains a single operator. All operator inputs and
@@ -946,6 +958,7 @@ class SingleOpModel {
   // Populates the tensor starting at offset using given data.
   template <typename T, typename Container>
   void PopulateTensorImpl(int index, int offset, const Container& data) {
+
     T* v = interpreter_->typed_tensor<T>(index);
     if (!v) {
       auto* t = interpreter_->tensor(index);

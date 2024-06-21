@@ -472,6 +472,7 @@ enum BuiltinOperator : int32 {
   STABLEHLO_RNG_BIT_GENERATOR = 204,
   REDUCE_WINDOW = 205 (deprecated),
   STABLEHLO_COMPOSITE = 206, // WARNING: No runtime support
+  STABLEHLO_REDUCE_PRECISION = 207,
 }
 // LINT.ThenChange(nnapi_linter/linter.proto)
 
@@ -630,6 +631,7 @@ union BuiltinOptions2{
   StablehloRngBitGeneratorOptions,
   ReduceWindowOptions (deprecated),
   StableHLOCompositeOptions,
+  StablehloReducePrecisionOptions,
 }
 
 table StablehloGatherOptions{
@@ -667,6 +669,7 @@ table StablehloReduceWindowOptions{
   padding : [long];
   body_subgraph_index : int;
 }
+
 
 table StablehloWhileOptions{
   cond_subgraph_index : int;
@@ -772,6 +775,11 @@ table StablehloScatterOptions {
   index_vector_dim: long;
   unique_indices: bool;
   update_computation_subgraph_index: int;
+}
+
+table StablehloReducePrecisionOptions{
+  exponent_bits : int;
+  mantissa_bits : int;
 }
 
 enum RngAlgorithm : byte {

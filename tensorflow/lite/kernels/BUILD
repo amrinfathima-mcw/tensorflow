@@ -3,7 +3,11 @@ load("//tensorflow:tensorflow.default.bzl", "get_compatible_with_portable", "pyb
 load("//tensorflow/lite:build_def.bzl", "tflite_combine_cc_tests", "tflite_copts", "tflite_self_contained_libs_test_suite")
 load("//tensorflow/lite:special_rules.bzl", "tflite_portable_test_suite_combined")
 load("//tensorflow/lite/core/shims:cc_library_with_tflite.bzl", "cc_library_with_tflite")
-
+load(
+    "@local_xla//xla/tsl/mkl:build_defs.bzl",
+    "if_mkl",
+    "mkl_deps",
+)
 package(
     # copybara:uncomment default_applicable_licenses = ["//tensorflow:license"],
     default_visibility = [
@@ -770,6 +774,7 @@ BUILTIN_KERNEL_SRCS = [
     "stablehlo_multiply.cc",
     "stablehlo_pad.cc",
     "stablehlo_reduce_window.cc",
+    "stablehlo_reduce_precision.cc",
     "stablehlo_min_max.cc",
     "stablehlo_scatter.cc",
     "sign.cc",
@@ -822,6 +827,9 @@ BUILTIN_KERNEL_DEPS = [
     ":control_flow_common",
     "@eigen_archive//:eigen3",
     "@flatbuffers",
+    "//tensorflow/core/platform:byte_order",
+    "@local_tsl//tsl/platform:bfloat16",
+    "@local_tsl//tsl/platform:byte_order",
     "//tensorflow/lite:framework_stable",
     "//tensorflow/lite:minimal_logging",
     "//tensorflow/lite:string_util",
@@ -1942,6 +1950,33 @@ cc_test(
         "//tensorflow/lite/schema:schema_fbs",
         "@com_google_googletest//:gtest",
         "@flatbuffers",
+    ],
+)
+
+cc_test(
+    name = "stablehlo_reduce_precision_test",
+    size = "small",
+    srcs = ["stablehlo_reduce_precision_test.cc"],
+    deps = [
+        ":test_main",
+        ":test_util",
+        "//tensorflow/lite/core/c:common",
+        "//tensorflow/lite/schema:schema_fbs",
+        "@com_google_googletest//:gtest",
+        "@flatbuffers",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/types:span",
+        "@com_google_absl//absl/random:bit_gen_ref",
+        "@com_google_absl//absl/base:base",
+        "@com_google_absl//absl/random:distributions",
+        "@com_google_absl//absl/random:seed_sequences",
+        "@com_google_absl//absl/random:seed_gen_exception",
+        "@com_google_absl//absl/status:statusor",
+        "//tensorflow/core/platform:bfloat16",
+        "//tensorflow/core/platform:float8",
+        "//tensorflow/core/platform:byte_order",
+        "@local_tsl//tsl/platform:bfloat16",
+        "@local_tsl//tsl/platform:byte_order",
     ],
 )
 

@@ -21,7 +21,7 @@ limitations under the License.
 #include <memory>
 
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
-#include "flatbuffers/vector.h"  // from @flatbuffers
+#include "flatbuffers/vector.h"       // from @flatbuffers
 #include "tensorflow/lite/core/api/error_reporter.h"
 #include "tensorflow/lite/core/c/builtin_op_data.h"
 #include "tensorflow/lite/core/c/common.h"
@@ -924,6 +924,10 @@ TfLiteStatus ParseOpDataTfLite(const Operator* op, BuiltinOperator op_type,
     case BuiltinOperator_STABLEHLO_COMPOSITE: {
       return ParseStablehloComposite(op, error_reporter, allocator,
                                      builtin_data);
+    }
+    case BuiltinOperator_STABLEHLO_REDUCE_PRECISION: {
+      return ParseStablehloReducePrecision(op, error_reporter, allocator,
+                                           builtin_data);
     }
     // TODO: skip param parsing for now since ops below don't have kernels
     case BuiltinOperator_STABLEHLO_SLICE:
@@ -2407,6 +2411,40 @@ TfLiteStatus ParseStablehloComposite(const Operator* op,
   TF_LITE_REPORT_ERROR(
       error_reporter,
       "Could not get 'stablehlo.composite' operation parameters.");
+  return kTfLiteError;
+}
+
+TfLiteStatus ParseStablehloReducePrecision(const Operator* op,
+                                           ErrorReporter* error_reporter,
+                                           BuiltinDataAllocator* allocator,
+                                           void** builtin_data) {
+  CheckParsePointerParams(op, error_reporter, allocator, builtin_data);
+
+  SafeBuiltinDataAllocator safe_allocator(allocator);
+  auto params = safe_allocator.Allocate<TfLiteStablehloReducePrecisionParams>();
+  const StablehloReducePrecisionOptions* schema_params =
+      op->builtin_options_2_as_StablehloReducePrecisionOptions();
+  if (schema_params) {
+    if (schema_params->exponent_bits() < 1) {
+      TF_LITE_REPORT_ERROR(error_reporter,
+                           "stablehlo.reduce_precision: 'Exponent_bits' must "
+                           "be greater than or equal to 1.");
+      return kTfLiteError;
+    }
+    if (schema_params->mantissa_bits() < 0) {
+      TF_LITE_REPORT_ERROR(error_reporter,
+                           "stablehlo.reduce_precision: 'Mantissa_bits' must "
+                           "be greater than or equal to 0.");
+      return kTfLiteError;
+    }
+    params->exponent_bits = schema_params->exponent_bits();
+    params->mantissa_bits = schema_params->mantissa_bits();
+    *builtin_data = params.release();
+    return kTfLiteOk;
+  }
+  TF_LITE_REPORT_ERROR(
+      error_reporter,
+      "Could not get 'stablehlo.reduce_precision' operation parameters.");
   return kTfLiteError;
 }
 
