@@ -13,7 +13,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 #include <cmath>
-
 #include "tensorflow/lite/core/c/common.h"
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/lut.h"
@@ -98,6 +97,16 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
         reference_ops::Exp(GetTensorData<float>(op_context.input),
                            NumElements(op_context.input),
                            GetTensorData<float>(op_context.output));
+        break;
+      case kTfLiteFloat16:
+        reference_ops::Exp(GetTensorData<Eigen::half>(op_context.input),
+                           NumElements(op_context.input),
+                           GetTensorData<Eigen::half>(op_context.output));
+        break;
+      case kTfLiteBFloat16:
+        reference_ops::Exp(GetTensorData<Eigen::bfloat16>(op_context.input),
+                           NumElements(op_context.input),
+                           GetTensorData<Eigen::bfloat16>(op_context.output));
         break;
       case kTfLiteInt8:
         reference_integer_ops::LookupTable(
