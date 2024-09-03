@@ -107,6 +107,11 @@ constexpr TfLiteType typeToTfLiteType<Eigen::half>() {
   return kTfLiteFloat16;
 }
 
+template <>
+constexpr TfLiteType typeToTfLiteType<Eigen::bfloat16>() {
+  return kTfLiteBFloat16;
+}
+
 // A test model that contains a single operator. All operator inputs and
 // output are external to the model, so the tests can directly access them.
 // Typical usage:
@@ -1146,13 +1151,13 @@ struct TensorTypeFor;
 TFLITE_TENSOR_TYPE_ASSOC(bool, TensorType_BOOL);
 TFLITE_TENSOR_TYPE_ASSOC(int8_t, TensorType_INT8);
 TFLITE_TENSOR_TYPE_ASSOC(int16_t, TensorType_INT16);
+TFLITE_TENSOR_TYPE_ASSOC(TfLiteFloat16, TensorType_FLOAT16);
 TFLITE_TENSOR_TYPE_ASSOC(int32_t, TensorType_INT32);
 TFLITE_TENSOR_TYPE_ASSOC(int64_t, TensorType_INT64);
 TFLITE_TENSOR_TYPE_ASSOC(uint8_t, TensorType_UINT8);
 TFLITE_TENSOR_TYPE_ASSOC(uint16_t, TensorType_UINT16);
 TFLITE_TENSOR_TYPE_ASSOC(uint32_t, TensorType_UINT32);
 TFLITE_TENSOR_TYPE_ASSOC(uint64_t, TensorType_UINT64);
-TFLITE_TENSOR_TYPE_ASSOC(TfLiteFloat16, TensorType_FLOAT16);
 TFLITE_TENSOR_TYPE_ASSOC(Eigen::half, TensorType_FLOAT16);
 TFLITE_TENSOR_TYPE_ASSOC(float, TensorType_FLOAT32);
 TFLITE_TENSOR_TYPE_ASSOC(double, TensorType_FLOAT64);
