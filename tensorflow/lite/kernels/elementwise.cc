@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
+#include <iostream>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -47,6 +47,7 @@ namespace {
 const char kAbsName[] = "Abs";
 const char kLogName[] = "Log";
 const char kRsqrtName[] = "Rsqrt";
+const char kSqrtName[] = "Sqrt";
 
 struct OpData {
   int32_t multiplier;
@@ -91,6 +92,13 @@ inline void SetRsqrtOutputMultiplier(const float input_scale,
                                      const float output_scale,
                                      int32_t* multiplier, int32_t* shift) {
   const double scale = 1. / (std::sqrt(input_scale) * output_scale);
+  QuantizeMultiplier(scale, multiplier, shift);
+}
+
+inline void SetSqrtOutputMultiplier(const float input_scale,
+                                     const float output_scale,
+                                     int32_t* multiplier, int32_t* shift) {
+  const double scale = (std::sqrt(input_scale) * output_scale);
   QuantizeMultiplier(scale, multiplier, shift);
 }
 
@@ -160,6 +168,9 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node,
     TF_LITE_ENSURE(context, output_params->scale != nullptr);
     TF_LITE_ENSURE(context, output_params->scale->size > 0);
     TF_LITE_ENSURE(context, output_params->zero_point->size > 0);
+    std::cout<<"input params "<<input_params->zero_point->data[0]<<" "<<input_params->scale->data[0]<<std::endl;
+    std::cout<<"if opdata input offset is nullptr: "<<(&op_data->input_offset == nullptr)<<"  "<<(op_data == nullptr)<<std::endl;
+    std::cout<<"  "<<op_data->input_offset<<std::endl;
     op_data->input_offset = input_params->zero_point->data[0];
     op_data->output_offset = output_params->zero_point->data[0];
     if (input->type == kTfLiteInt16) {
@@ -193,6 +204,9 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node,
     } else if (op_name == kLogName) {
       LogLUTPrepare(input->type, op_data, input_scale, op_data->input_offset,
                     output_scale, op_data->output_offset);
+    }else if (op_name == kSqrtName) {
+      SetSqrtOutputMultiplier(input_scale, output_scale,
+                                 &op_data->multiplier, &op_data->shift);
     }
   }
   return context->ResizeTensor(context, output,
@@ -346,7 +360,45 @@ TfLiteStatus LogEval(TfLiteContext* context, TfLiteNode* node) {
   }
 }
 
+TfLiteStatus SqrtEvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node, TfLiteType type) {
+  const auto* op_data = static_cast<const OpData*>(node->user_data);
+  const int kMin = std::numeric_limits<int8_t>::min();
+  const int kMax = std::numeric_limits<int8_t>::max();
+
+  std::function<TfLiteStatus(int8_t)> validate_input_func = [&](int8_t i) {
+    TF_LITE_ENSURE_MSG(context, i >= op_data->input_offset,
+                       "Sqrt is only defined for non-negative values");
+    return kTfLiteOk;
+  };
+
+  std::function<int8_t(int8_t)> func = [&](int8_t i) {
+    const int32_t value = (i - op_data->input_offset);
+    const int32_t kShift = 20;  // Shift to keep value integer.
+    if (value < 0) {
+      return static_cast<int8_t>(kMin);
+    }
+    if (value == 0) {
+      return static_cast<int8_t>(op_data->output_offset);
+    }
+    
+    int32_t sqrt_multiplier;
+    int sqrt_shift;
+    GetSqrtQuantizedMultiplierExp(value, kReverseShift, &sqrt_multiplier, &sqrt_shift);
+    const int32_t data = MultiplyByQuantizedMultiplier(value, sqrt_multiplier, sqrt_shift + kShift);
+    const int32_t output =
+        MultiplyByQuantizedMultiplier(data, op_data->multiplier, op_data->shift - kShift) +
+        op_data->output_offset;
+        std::cout<<"val "<<i<<" value "<<value<<" data "<<data<<" output "<<output<<std::endl;
+    return static_cast<int8_t>(std::min(std::max(output, kMin), kMax));
+  };
+    return EvalImpl<int8_t>(context, node, func, validate_input_func, type);
+}
+
 TfLiteStatus SqrtEval(TfLiteContext* context, TfLiteNode* node) {
+    const TfLiteTensor* input;
+  TF_LITE_ENSURE_OK(context, GetInputSafe(context, node, 0, &input));
+   switch (input->type) {
+    case kTfLiteFloat32:{
 #ifdef TFLITE_KERNEL_USE_XNNPACK
   const TfLiteTensor* input;
   TF_LITE_ENSURE_OK(context, GetInputSafe(context, node, 0, &input));
@@ -372,6 +424,14 @@ TfLiteStatus SqrtEval(TfLiteContext* context, TfLiteNode* node) {
   }
 #endif  // TFLITE_KERNEL_USE_XNNPACK
   return EvalNumeric(context, node, std::sqrt);
+    }
+    case kTfLiteInt8:
+      return SqrtEvalQuantizedInt8(context, node, kTfLiteInt8);
+    default:
+      TF_LITE_KERNEL_LOG(context, "Current data type %s is not supported.",
+                         TfLiteTypeGetName(input->type));
+      return kTfLiteError;
+   }
 }
 
 TfLiteStatus RsqrtEvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
@@ -387,6 +447,7 @@ TfLiteStatus RsqrtEvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
 
   std::function<int8_t(int8_t)> func = [&](int8_t i) {
     const int32_t value = (i - op_data->input_offset);
+    std::cout<<"i "<<int(i)<<" value "<<value<<std::endl;
     const int32_t kShift = 20;  // Shift to keep value integer.
     if (value == 0) {
       // Assume that any value close to 0 represents the max output value.
@@ -527,10 +588,11 @@ TfLiteRegistration* Register_LOG() {
   return &r;
 }
 
-GENERIC_PREPARE(PrepareSqrt, elementwise::IsNumericSupportedType, "Sqrt")
+GENERIC_PREPARE(PrepareSqrt, elementwise::IsRsqrtSupportedType, elementwise::kSqrtName)
 
 TfLiteRegistration* Register_SQRT() {
-  static TfLiteRegistration r = {/*init=*/nullptr, /*free=*/nullptr,
+  static TfLiteRegistration r = {elementwise::ElementWiseQuantizedInit,
+                                 elementwise::ElementWiseQuantizedFree,
                                  PrepareSqrt, elementwise::SqrtEval};
   return &r;
 }
