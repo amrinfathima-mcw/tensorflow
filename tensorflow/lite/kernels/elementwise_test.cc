@@ -377,6 +377,27 @@ TEST(ElementWise, SqrtInt8) {
               ElementsAreArray(ArrayFloatNear(sqrt_data, kInputScale)));
 }
 
+TEST(ElementWise, sqrtInt8) {
+  const float input_min = -0.8f;
+  const float input_max = 0.8f;
+
+  const float output_min = -2.4f;
+  const float output_max = 2.4f;
+
+  const float kQuantizedTolerance =
+      GetLUTTolerance<int8_t>(input_min, input_max, output_min, output_max);
+
+  ElementWiseOpQuantizedModel m(BuiltinOperator_SQRT,
+                                {TensorType_INT8, {1, 1, 4, 1}, -10, 10},
+                                {TensorType_INT8, {1, 1, 4, 1}, -10, 10});
+  m.QuantizeAndPopulate<int8_t>(m.input(), {1, 0.1, 4, 9});
+  ASSERT_EQ(m.Invoke(), kTfLiteOk);
+  EXPECT_THAT(
+      m.ExtractDequantVector<int8_t>(m.output()),
+      ElementsAreArray(ArrayFloatNear({1.00009, 3.19407, 0.500198, 0.333262},
+                                      kQuantizedTolerance)));
+}
+
 TEST(ElementWise, RsqrtInt8) {
   std::vector<float> data = {15., 46., 78., 142., 1., 17., 49., 113.};
   std::vector<float> rsqrt_data(data.size());

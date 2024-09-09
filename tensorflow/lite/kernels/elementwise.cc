@@ -21,6 +21,7 @@ limitations under the License.
 #include <functional>
 #include <limits>
 
+#include "internal/common.h"
 #include "tensorflow/lite/core/c/common.h"
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
@@ -205,10 +206,25 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node,
       LogLUTPrepare(input->type, op_data, input_scale, op_data->input_offset,
                     output_scale, op_data->output_offset);
     }else if (op_name == kSqrtName) {
-      SetSqrtOutputMultiplier(input_scale, output_scale,
-                                 &op_data->multiplier, &op_data->shift);
+      // SetSqrtOutputMultiplier(input_scale, output_scale,
+      //                            &op_data->multiplier, &op_data->shift);
+      if (input->type == kTfLiteInt8) {
+        const void* lut_func_params = static_cast<const void*>(&output_scale);
+        const auto lut_func = [](float value, const void* lut_func_params) {
+          if (value <= 0.0f) {
+            const float output_scale =
+                *static_cast<const float*>(lut_func_params);
+            return std::numeric_limits<int8_t>::max() * output_scale;
+          }
+          std::cout<<"value of x "<<value<<std::endl;
+          return std::sqrt(value);
+        };
+        LUTPopulate<int8_t>(input_scale, input_params->zero_point->data[0],
+                             output_scale, output_params->zero_point->data[0],
+                             lut_func, lut_func_params, op_data->lut_int8);
+      }
     }
-  }
+       }
   return context->ResizeTensor(context, output,
                                TfLiteIntArrayCopy(input->dims));
 }
@@ -361,6 +377,7 @@ TfLiteStatus LogEval(TfLiteContext* context, TfLiteNode* node) {
 }
 
 TfLiteStatus SqrtEvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node, TfLiteType type) {
+  /*
   const auto* op_data = static_cast<const OpData*>(node->user_data);
   const int kMin = std::numeric_limits<int8_t>::min();
   const int kMax = std::numeric_limits<int8_t>::max();
@@ -384,14 +401,25 @@ TfLiteStatus SqrtEvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node, TfL
     int32_t sqrt_multiplier;
     int sqrt_shift;
     GetSqrtQuantizedMultiplierExp(value, kReverseShift, &sqrt_multiplier, &sqrt_shift);
-    const int32_t data = MultiplyByQuantizedMultiplier(value, sqrt_multiplier, sqrt_shift + kShift);
+    const int32_t data = MultiplyByQuantizedMultiplier(1, sqrt_multiplier, sqrt_shift + kShift);
     const int32_t output =
-        MultiplyByQuantizedMultiplier(data, op_data->multiplier, op_data->shift - kShift) +
+        MultiplyByQuantizedMultiplier(data, op_data->multiplier, op_data->shift) +
         op_data->output_offset;
         std::cout<<"val "<<i<<" value "<<value<<" data "<<data<<" output "<<output<<std::endl;
     return static_cast<int8_t>(std::min(std::max(output, kMin), kMax));
   };
     return EvalImpl<int8_t>(context, node, func, validate_input_func, type);
+    */
+      auto op_data = reinterpret_cast<OpData*>(node->user_data);
+  const TfLiteTensor* input;
+  TF_LITE_ENSURE_OK(context, GetInputSafe(context, node, 0, &input));
+  TfLiteTensor* output;
+  TF_LITE_ENSURE_OK(context, GetOutputSafe(context, node, 0, &output));
+  reference_integer_ops::LookupTable(
+      GetTensorData<int8_t>(input),
+      MatchingFlatSize(GetTensorShape(input), GetTensorShape(output)),
+      op_data->lut_int8, GetTensorData<int8_t>(output));
+  return kTfLiteOk;
 }
 
 TfLiteStatus SqrtEval(TfLiteContext* context, TfLiteNode* node) {
@@ -457,12 +485,15 @@ TfLiteStatus RsqrtEvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
     int inv_sqrt_shift;
     GetInvSqrtQuantizedMultiplierExp(value, kReverseShift, &inv_sqrt_multiplier,
                                      &inv_sqrt_shift);
+    std::cout<<"kReverseShift "<<kReverseShift<<" inv_sqrt_mul "<<inv_sqrt_multiplier<<"  inv_sqrt_shift "<<inv_sqrt_shift<<std::endl;
     const int32_t data = MultiplyByQuantizedMultiplier(1, inv_sqrt_multiplier,
                                                        inv_sqrt_shift + kShift);
+    std::cout<<"data "<<data<<std::endl;
     const int32_t output =
         MultiplyByQuantizedMultiplier(data, op_data->multiplier,
                                       op_data->shift - kShift) +
         op_data->output_offset;
+    std::cout<<"output  "<<output<<std::endl;
     return static_cast<int8_t>(std::min(std::max(output, kMin), kMax));
   };
 
